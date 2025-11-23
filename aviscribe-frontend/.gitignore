@@ -1,0 +1,103 @@
+# ---- 通用 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志
+*.log
+logs/
+log/
+*.dumpstream
+
+# 临时文件
+*.tmp
+*.swp
+*.swo
+*.bak
+*.orig
+
+# ---- IDE & 编辑器 ----
+# IntelliJ / IDEA / Android Studio
+.idea/
+*.iml
+*.iws
+out/
+
+# VS Code
+.vscode/
+.history/
+*.code-workspace
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# ---- 操作系统 ----
+# macOS
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+
+# Windows
+$RECYCLE.BIN/
+ehthumbs.db
+
+# ---- Java & Maven (aviscribe-backend) ----
+**/target/
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.jar
+
+# 编译生成的类
+*.class
+
+# 构建工具
+.gradle/
+build/
+
+# ---- Node / Vite 前端 (aviscribe-frontend) ----
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Vite / 前端构建输出
+dist/
+dist-ssr/
+*.local
+
+# ---- 测试与覆盖率 ----
+coverage/
+.nyc_output/
+jest-html-reporters-*.html
+test-results/
+
+# ---- 环境配置（如果你有本地敏感信息）----
+.env
+.env.*
+!.env.example
+
+# ---- 工具脚本缓存 ----
+.npm/
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# ---- 备份和打包文件 ----
+*.gz
+*.rar
+*.zip
+*.7z
+*.tar
+*.tgz
+
+# ---- 数据库 / 本地数据 ----
+*.db
+*.sqlite
+*.sqlite3

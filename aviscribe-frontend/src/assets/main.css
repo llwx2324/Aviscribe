@@ -1,0 +1,191 @@
+/* 全局样式 */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg);
+  color: var(--text-main);
+}
+
+#app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 主题变量 */
+:root {
+  --bg: #f8fafc; /* 更清爽的背景色 */
+  --surface: #ffffff;
+  --primary: #3b82f6; /* 现代蓝 */
+  --primary-hover: #2563eb;
+  --text-main: #1e293b;
+  --text-secondary: #64748b;
+  --border-color: #e2e8f0;
+  
+  --accent: #0f172a;
+  
+  --card-radius: 16px; /* 更大的圆角 */
+  --container-max: 1200px;
+  
+  /* 更细腻的阴影系统 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* 页面容器 */
+.content-wrapper {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 40px 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 卡片 / 面板 统一样式 */
+.el-card,
+.upload-card,
+.result-viewer {
+  background: var(--surface) !important;
+  border-radius: var(--card-radius) !important;
+  box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--border-color) !important;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.el-card:hover,
+.upload-card:hover {
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* 标题样式 */
+h1, h2, h3 {
+  color: var(--text-main);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+/* 上传区域美化 */
+.el-upload--drag {
+  border-radius: 12px !important;
+  background: #f8fafc !important;
+  border: 2px dashed #cbd5e1 !important;
+  transition: all 0.3s ease;
+}
+.el-upload--drag:hover {
+  border-color: var(--primary) !important;
+  background: #eff6ff !important;
+}
+.el-upload__text em { 
+  font-style: normal; 
+  color: var(--primary); 
+  font-weight: 600;
+}
+
+/* 表格风格 */
+.el-table {
+  --el-table-header-bg-color: #f1f5f9 !important;
+  --el-table-row-hover-bg-color: #f8fafc !important;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.el-table th {
+  font-weight: 600;
+  color: var(--text-main);
+}
+.el-table .el-table__body tr td {
+  padding: 16px 0;
+}
+
+/* 按钮美化 */
+.el-button--primary {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  font-weight: 500;
+}
+.el-button--primary:hover {
+  background-color: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+}
+
+/* 分页对齐 */
+.el-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+/* 标签和按钮 */
+.el-tag { 
+  font-weight: 600; 
+  border-radius: 6px;
+}
+.el-button[link] { 
+  font-weight: 500;
+}
+
+/* Footer 视觉 */
+.app-footer {
+  background-color: var(--surface);
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+/* Loading */
+.loading-container .is-loading { color: var(--primary); }
+
+/* 响应式微调 */
+@media (max-width: 768px) {
+  .content-wrapper { padding: 20px 16px; }
+  .upload-card { margin: 0 !important; width: 100% !important; }
+  .common-layout .app-header { padding: 0 16px; }
+}
+
+/* Markdown 样式优化 */
+.markdown-body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  color: #334155;
+}
+
+.markdown-body h1,
+.markdown-body h2 {
+  border-bottom: none;
+  color: #0f172a;
+}
+
+.markdown-body p {
+  margin-bottom: 1.25em;
+}
+
+.markdown-body code {
+  background-color: #f1f5f9;
+  color: #0f172a;
+  padding: 0.2em 0.4em;
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+
+.markdown-body pre {
+  background-color: #1e293b;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.markdown-body pre code {
+  color: #e2e8f0;
+  background-color: transparent;
+}
+
+.markdown-body blockquote {
+  border-left: 4px solid var(--primary);
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 0 8px 8px 0;
+  color: #475569;
+}

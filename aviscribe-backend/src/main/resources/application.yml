@@ -1,0 +1,103 @@
+server:
+  port: 8081
+  servlet:
+    context-path: /api # API 根路径
+
+spring:
+  application:
+    name: aviscribe-backend
+  
+  # 数据库配置
+  datasource:
+    url: jdbc:mysql://localhost:3306/aviscribe_db?serverTimezone=UTC&useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: 81287317 # !!! 替换为你的 MySQL 密码
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # MyBatis Plus 配置
+  mybatis-plus:
+    mapper-locations: classpath:/mapper/*.xml
+    global-config:
+      db-config:
+        logic-delete-field: false # 
+        id-type: auto
+    configuration:
+      log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 打印 SQL
+
+  # 文件上传配置
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 1024MB # 1GB
+      max-request-size: 1024MB
+
+  # 异步线程池配置 (见 ThreadPoolConfig.java)
+  task:
+    execution:
+      pool:
+        core-size: 4  # 核心线程数 (根据 CPU 核心数调整)
+        max-size: 16  # 最大线程数
+        queue-capacity: 100 # 队列容量
+
+# 自定义配置
+aviscribe:
+  file:
+    # !!! 替换为你服务器上用于存储的真实路径
+    upload-path: "D:/aviscribe/files/"
+  ffmpeg:
+    # Windows 下直接用 PATH 中的 ffmpeg，可留空或写 "ffmpeg"
+    path: "ffmpeg"
+  stt:
+    # 使用用户已有的环境变量名：ALIYUN_NLS_APP_KEY / ALIYUN_ACCESS_KEY_ID / ALIYUN_ACCESS_KEY_SECRET
+    app-key: ${ALIYUN_NLS_APP_KEY:}
+    access-key-id: ${ALIYUN_ACCESS_KEY_ID:}
+    access-key-secret: ${ALIYUN_ACCESS_KEY_SECRET:}
+    # NLS FileTrans 网关配置（来自官方示例）
+    region-id: "cn-shanghai"
+    endpoint-name: "cn-shanghai"
+    product: "nls-filetrans"
+    domain: "filetrans.cn-shanghai.aliyuncs.com"
+    api-version: "2018-08-17"  # 中国站版本
+    # 录音文件识别提交/查询的 Action 名称
+    submit-action: "SubmitTask"
+    query-action: "GetTaskResult"
+    # 轮询参数
+    max-poll-times: 60
+    poll-interval-ms: 3000
+    # 仍保留本地回退 URL（理论上不会再使用）
+    public-audio-base-url: "http://127.0.0.1:8090/audio/"
+  oss:
+    # OSS 访问配置：endpoint 与 bucket 名称
+    endpoint: "https://oss-cn-shanghai.aliyuncs.com"
+    bucket: "aviscribe"
+    # 默认复用 ALIYUN_ACCESS_KEY_ID / SECRET，如需单独配置可显式设置这两个字段
+    # access-key-id: ${ALIYUN_ACCESS_KEY_ID:}
+    # access-key-secret: ${ALIYUN_ACCESS_KEY_SECRET:}
+    # 存储音频文件的对象前缀，可按需调整（末尾不加 / 也可以）
+    object-prefix: "audio"
+    # 是否为每个对象生成带过期时间的签名 URL；若 bucket/object 设置为公共读，可设为 false 直接拼公共 URL
+    use-signed-url: true
+    # 签名 URL 过期时间（秒），默认 24 小时
+    signed-url-expire-seconds: 86400
+  llm:
+    # DeepSeek (OpenAI 兼容) 配置，从环境变量读取
+    api-key: ${DS_API_KEY:}
+    base-url: ${DS_BASE_URL:https://api.deepseek.com}
+    model: ${DS_MODEL:deepseek-chat}
+  downloader:
+    # yt-dlp 可执行文件路径，确保已安装并在 PATH 中，或写绝对路径，例如 "C:/tools/yt-dlp.exe"
+    yt-dlp-path: "yt-dlp"
+  security:
+    jwt:
+      # !!! 请使用长度>=32的随机字符串
+      secret: ${AVISCRIBE_JWT_SECRET:default-jwt-secret-change-me-please-1234567890}
+      access-exp-minutes: 30
+      refresh-exp-days: 7
+    rate-limit:
+      auth:
+        max-requests: 10
+        window-seconds: 60
+
+logging:
+  level:
+    com.aviscribe: debug
