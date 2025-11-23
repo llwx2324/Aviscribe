@@ -101,3 +101,6 @@ test-results/
 *.db
 *.sqlite
 *.sqlite3
+
+gen_backend.js
+gen_frontend.js
