@@ -55,8 +55,8 @@ const fetchResult = async (taskId) => {
 };
 
 watch(
-  () => route.params.id,
-  (newId) => {
+  () => [route.params.id, route.query.refresh],
+  ([newId]) => {
     fetchResult(newId);
   },
   { immediate: true }

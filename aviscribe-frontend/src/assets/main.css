@@ -10,7 +10,7 @@ body {
 }
 
 #app {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -24,6 +24,7 @@ body {
   --text-main: #1e293b;
   --text-secondary: #64748b;
   --border-color: #e2e8f0;
+  --app-header-height: 72px;
   
   --accent: #0f172a;
   
@@ -188,4 +189,20 @@ h1, h2, h3 {
   padding: 16px;
   border-radius: 0 8px 8px 0;
   color: #475569;
+}
+
+/* 文档容器防止内容被遮挡：允许内部滚动并保留底部安全间距 */
+.el-card .markdown-body,
+.markdown-body {
+  box-sizing: border-box;
+  padding-bottom: 24px; /* 底部安全间距，防止最后一行被遮住 */
+}
+
+/* 优化滚动条（可选，视觉更轻） */
+.markdown-body::-webkit-scrollbar {
+  width: 10px;
+}
+.markdown-body::-webkit-scrollbar-thumb {
+  background: rgba(15,23,42,0.08);
+  border-radius: 8px;
 }

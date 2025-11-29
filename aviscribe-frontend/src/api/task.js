@@ -24,3 +24,11 @@ export function deleteTask(taskId) {
     method: 'delete'
   })
 }
+
+export function renameTask(taskId, taskName) {
+  return request({
+    url: `/task/${taskId}/name`,
+    method: 'patch',
+    data: { taskName }
+  })
+}

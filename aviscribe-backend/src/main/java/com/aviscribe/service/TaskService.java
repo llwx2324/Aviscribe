@@ -12,4 +12,5 @@ public interface TaskService extends IService<Task> {
     void deleteTask(Long id); // 需删除文件
     void updateTaskStatus(Long taskId, com.aviscribe.common.enums.TaskStatus status);
     void updateTaskError(Long taskId, String error);
+    void updateTaskName(Long taskId, String taskName);
 }

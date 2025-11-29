@@ -45,6 +45,15 @@
           </div>
           <div class="item-meta">
             <el-button 
+              v-if="task.taskStatus === 6"
+              link
+              size="small"
+              class="icon-button edit-btn"
+              @click.stop="openEditDialog(task)"
+            >
+              <el-icon><Edit /></el-icon>
+            </el-button>
+            <el-button 
               v-if="task.taskStatus === 6 || task.taskStatus === 7"
               type="danger" 
               link 
@@ -69,14 +78,38 @@
       </div>
     </div>
   </el-card>
+
+  <el-dialog
+    v-model="editDialogVisible"
+    title="修改任务名称"
+    width="420px"
+    :close-on-click-modal="false"
+  >
+    <el-form label-width="80px">
+      <el-form-item label="任务名称">
+        <el-input
+          v-model.trim="editForm.taskName"
+          placeholder="请输入任务名称"
+          maxlength="100"
+          show-word-limit
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="editDialogVisible = false" :disabled="editLoading">取消</el-button>
+        <el-button type="primary" :loading="editLoading" @click="submitTaskName">保存</el-button>
+      </span>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, reactive } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { getTaskList, deleteTask } from '@/api/task';
+import { getTaskList, deleteTask, renameTask } from '@/api/task';
 import { ElMessage } from 'element-plus';
-import { Refresh, Delete } from '@element-plus/icons-vue';
+import { Refresh, Delete, Edit } from '@element-plus/icons-vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -89,6 +122,9 @@ const currentTaskId = ref(null);
 const filterType = ref('ALL'); // ALL, LOCAL, URL
 const SOURCE_TYPE = Object.freeze({ LOCAL: 1, URL: 2 });
 let timer = null;
+const editDialogVisible = ref(false);
+const editForm = reactive({ id: null, taskName: '' });
+const editLoading = ref(false);
 
 // 监听路由变化，高亮当前选中的任务
 watch(() => route.params.id, (newId) => {
@@ -133,6 +169,11 @@ const handlePageChange = (page) => {
 };
 
 const handleTaskClick = (id) => {
+  if (currentTaskId.value === id) {
+    const query = { ...route.query, refresh: Date.now().toString() };
+    router.push({ name: 'workspaceResult', params: { id }, query });
+    return;
+  }
   router.push({ name: 'workspaceResult', params: { id } });
 };
 
@@ -146,6 +187,35 @@ const handleDelete = async (id) => {
     }
   } catch (error) {
     console.error(error);
+  }
+};
+
+const openEditDialog = (task) => {
+  editForm.id = task.id;
+  editForm.taskName = getTaskDisplayName(task);
+  editDialogVisible.value = true;
+};
+
+const submitTaskName = async () => {
+  const trimmed = editForm.taskName ? editForm.taskName.trim() : '';
+  if (!trimmed) {
+    ElMessage.warning('请输入任务名称');
+    return;
+  }
+  editLoading.value = true;
+  try {
+    await renameTask(editForm.id, trimmed);
+    ElMessage.success('任务名称已更新');
+    editDialogVisible.value = false;
+    fetchTasks();
+    if (currentTaskId.value === editForm.id) {
+      const query = { ...route.query, refresh: Date.now().toString() };
+      router.replace({ name: 'workspaceResult', params: { id: editForm.id }, query });
+    }
+  } catch (error) {
+    console.error(error);
+  } finally {
+    editLoading.value = false;
   }
 };
 
@@ -199,9 +269,18 @@ defineExpose({ fetchTasks });
 <style scoped>
 .history-card {
   height: 100%;
+  display: flex;
+  flex-direction: column;
   border: none !important;
   box-shadow: var(--shadow-md) !important;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.85), #ffffff);
+}
+
+.history-card :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .card-header {
@@ -238,9 +317,13 @@ defineExpose({ fetchTasks });
 
 .history-list-container {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  padding: 0 0 96px 0;
+  scroll-padding-bottom: 96px;
+  box-sizing: border-box;
 }
 
 .empty-history {
@@ -256,6 +339,7 @@ defineExpose({ fetchTasks });
   flex-direction: column;
   gap: 8px;
   padding: 12px;
+  flex: 1;
 }
 
 .history-item {
@@ -334,6 +418,26 @@ defineExpose({ fetchTasks });
   border-radius: 20px;
   border: none;
   font-weight: 600;
+}
+
+.icon-button {
+  padding: 0 !important;
+  min-height: auto;
+  color: #475569;
+  background: transparent !important;
+}
+
+.icon-button :deep(.el-icon) {
+  font-size: 16px;
+}
+
+.icon-button.edit-btn {
+  color: #2563eb;
+}
+
+.icon-button.edit-btn:hover {
+  color: #1d4ed8;
+  background: transparent !important;
 }
 
 .history-item.status-done .status-dot {

@@ -23,7 +23,9 @@ const refreshHistory = () => {
     <div class="content-area">
       <RouterView v-slot="{ Component }">
         <transition name="fade" mode="out-in">
-          <component :is="Component" @upload-success="refreshHistory" />
+          <div class="content-scroll">
+            <component :is="Component" @upload-success="refreshHistory" />
+          </div>
         </transition>
       </RouterView>
     </div>
@@ -37,6 +39,8 @@ const refreshHistory = () => {
   height: 100%;
   max-width: 1600px;
   margin: 0 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .dashboard-layout.no-sidebar {
@@ -53,6 +57,8 @@ const refreshHistory = () => {
   flex-direction: column;
   gap: 20px;
   flex-shrink: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .sidebar-section {
@@ -62,12 +68,24 @@ const refreshHistory = () => {
 .history-section {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .content-area {
   flex: 1;
   min-width: 0;
-  min-height: 100%;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 @media (max-width: 1024px) {

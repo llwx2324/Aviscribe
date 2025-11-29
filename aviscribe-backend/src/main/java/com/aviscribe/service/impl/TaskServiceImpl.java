@@ -89,6 +89,25 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         this.updateById(update);
     }
 
+    @Override
+    public void updateTaskName(Long taskId, String taskName) {
+        if (taskName == null || taskName.trim().isEmpty()) {
+            throw new IllegalArgumentException("任务名称不能为空");
+        }
+        Task task = this.getById(taskId);
+        if (task == null) {
+            throw new IllegalArgumentException("任务不存在");
+        }
+        ensureTaskAccessible(task);
+        if (task.getTaskStatus() == null || task.getTaskStatus() != TaskStatus.COMPLETED.getCode()) {
+            throw new IllegalStateException("任务未完成，暂不可修改名称");
+        }
+        Task update = new Task();
+        update.setId(taskId);
+        update.setTaskName(taskName.trim());
+        this.updateById(update);
+    }
+
     private void ensureDurationPresent(Task task) {
         if (task == null) {
             return;

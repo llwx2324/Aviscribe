@@ -8,19 +8,6 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
-const navItems = [
-  { label: '工作台', to: '/app' },
-  { label: '任务列表', to: '/app/tasks' },
-  { label: '个人资料', to: '/app/profile' }
-]
-
-const isActive = (path) => {
-  if (path === '/app') {
-    return route.path === '/app'
-  }
-  return route.path.startsWith(path)
-}
-
 const isAuthenticated = computed(() => authStore.isAuthenticated())
 const displayName = computed(() => authStore.state.profile?.displayName || '未命名用户')
 const isLanding = computed(() => route.path === '/')
@@ -59,20 +46,7 @@ const goRegister = () => router.push({ name: 'register' })
           </div>
         </RouterLink>
 
-        <nav class="nav-links" v-if="!isLanding">
-          <RouterLink
-            v-for="item in navItems"
-            :key="item.to"
-            :to="item.to"
-            class="nav-link"
-            :class="{ active: isActive(item.to) }"
-          >
-            {{ item.label }}
-          </RouterLink>
-        </nav>
-
         <div class="header-actions" v-if="!isLanding && isAuthenticated">
-          <el-button text class="ghost-link" @click="$router.push('/app/tasks')">我的任务</el-button>
           <el-dropdown trigger="click">
             <span class="user-chip">
               <el-icon class="chip-icon"><Monitor /></el-icon>
@@ -106,9 +80,11 @@ const goRegister = () => router.push({ name: 'register' })
 <style scoped>
 .common-layout {
   min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 40%, #f8fafc 100%);
+  overflow: hidden;
 }
 
 .app-header {
@@ -130,6 +106,9 @@ const goRegister = () => router.push({ name: 'register' })
 .common-layout.landing-layout {
   background: radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.12), transparent 45%),
               linear-gradient(180deg, #eef2ff 0%, #e0e7ff 50%, #eef2ff 100%);
+  min-height: auto;
+  height: auto;
+  overflow: visible;
 }
 
 .header-content {
@@ -182,56 +161,6 @@ const goRegister = () => router.push({ name: 'register' })
   letter-spacing: 1px;
   transform: scale(0.9);
   transform-origin: left;
-}
-
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-
-.nav-link {
-  text-decoration: none;
-  font-size: 15px;
-  color: rgba(15, 23, 42, 0.65);
-  font-weight: 500;
-  padding: 6px 4px;
-  position: relative;
-  transition: color 0.2s ease, transform 0.2s ease;
-}
-
-.nav-link::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -4px;
-  height: 3px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--primary), #22d3ee);
-  transform: scaleX(0);
-  transform-origin: center;
-  opacity: 0;
-  transition: transform 0.25s ease, opacity 0.25s ease;
-}
-
-.nav-link:hover {
-  color: #0f172a;
-  transform: translateY(-1px);
-}
-
-.nav-link:hover::after {
-  transform: scaleX(1);
-  opacity: 0.4;
-}
-
-.nav-link.active {
-  color: #0f172a;
-}
-
-.nav-link.active::after {
-  transform: scaleX(1);
-  opacity: 1;
 }
 
 .header-actions {
@@ -303,6 +232,11 @@ const goRegister = () => router.push({ name: 'register' })
   padding: 20px 24px 32px;
   overflow: hidden;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: calc(100vh - var(--app-header-height, 72px));
+  box-sizing: border-box;
 }
 
 .main-container::before {
@@ -317,6 +251,8 @@ const goRegister = () => router.push({ name: 'register' })
 
 .main-container.landing-main {
   padding: 0;
+  height: auto;
+  overflow: visible;
 }
 
 .main-container.landing-main::before {
@@ -338,11 +274,6 @@ const goRegister = () => router.push({ name: 'register' })
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
-  }
-
-  .nav-links {
-    width: 100%;
-    justify-content: space-between;
   }
 
   .header-actions {

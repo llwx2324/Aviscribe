@@ -104,3 +104,23 @@ test-results/
 
 gen_backend.js
 gen_frontend.js
+
+# ---- 本地启动脚本与结构说明 ----
+start-all.bat
+stop-all.bat
+structure.txt
+
+# Backend build
+aviscribe-backend/target/
+
+# Frontend build & deps
+aviscribe-frontend/node_modules/
+aviscribe-frontend/dist/
+
+# IDE & env
+.idea/
+.venv/
+
+# Frontend env (如含敏感信息再开启)
+# aviscribe-frontend/.env
+

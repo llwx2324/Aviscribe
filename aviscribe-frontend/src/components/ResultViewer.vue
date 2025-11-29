@@ -126,22 +126,17 @@ const goBack = () => {
 
 .result-tabs :deep(.el-tabs__content) {
   padding: 0;
-  max-height: calc(100vh - 220px);
 }
 
 .markdown-wrapper {
   padding: 40px;
   background-color: #ffffff;
   min-height: 400px;
-  max-height: calc(100vh - 220px);
-  overflow-y: auto;
 }
 
 .raw-text-wrapper {
   padding: 20px;
   background-color: #f8fafc;
-  max-height: calc(100vh - 220px);
-  overflow-y: auto;
 }
 
 .raw-textarea :deep(.el-textarea__inner) {
@@ -162,10 +157,8 @@ const goBack = () => {
 }
 
 @media (max-width: 768px) {
-  .result-tabs :deep(.el-tabs__content),
-  .markdown-wrapper,
-  .raw-text-wrapper {
-    max-height: none;
+  .markdown-wrapper {
+    padding: 24px;
   }
 }
 </style>

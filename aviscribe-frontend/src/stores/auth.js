@@ -24,6 +24,13 @@ const state = reactive({
   profile: loadProfile()
 })
 
+const EXP_SKEW_MS = 5000
+
+const isTimestampValid = (epochSeconds) => {
+  if (!epochSeconds) return false
+  return epochSeconds * 1000 > Date.now() + EXP_SKEW_MS
+}
+
 function persistState() {
   if (state.accessToken) {
     localStorage.setItem(ACCESS_TOKEN_KEY, state.accessToken)
@@ -72,15 +79,24 @@ function updateProfile(profile) {
 }
 
 function isAuthenticated() {
-  return Boolean(state.accessToken)
+  if (!state.accessToken) return false
+  if (!isTimestampValid(state.accessTokenExpiresAt)) {
+    clearSession()
+    return false
+  }
+  return true
 }
 
 function getAccessToken() {
-  return state.accessToken
+  return isAuthenticated() ? state.accessToken : ''
 }
 
 function getRefreshToken() {
-  return state.refreshToken
+  if (state.refreshToken && isTimestampValid(state.refreshTokenExpiresAt)) {
+    return state.refreshToken
+  }
+  clearSession()
+  return ''
 }
 
 export function useAuthStore() {

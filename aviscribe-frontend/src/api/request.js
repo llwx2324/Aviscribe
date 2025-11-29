@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import router from '@/router'
 
 const authStore = useAuthStore()
 const refreshClient = axios.create({
@@ -59,14 +60,22 @@ service.interceptors.response.use(
         const originalRequest = error.config || {}
         if (originalRequest._retry) {
           authStore.clearSession()
-          ElMessage.error('登录状态已失效，请重新登录')
+          ElMessage.warning('请先登录')
+          router.push({
+            name: 'login',
+            query: { redirect: router.currentRoute.value.fullPath || '/app' }
+          })
           return Promise.reject(error)
         }
 
         const refreshToken = authStore.getRefreshToken()
         if (!refreshToken) {
           authStore.clearSession()
-          ElMessage.error('登录已过期，请重新登录')
+          ElMessage.warning('请先登录')
+          router.push({
+            name: 'login',
+            query: { redirect: router.currentRoute.value.fullPath || '/app' }
+          })
           return Promise.reject(error)
         }
 
@@ -93,7 +102,11 @@ service.interceptors.response.use(
         } catch (refreshError) {
           processQueue(refreshError, null)
           authStore.clearSession()
-          ElMessage.error('登录状态已过期，请重新登录')
+          ElMessage.warning('请先登录')
+          router.push({
+            name: 'login',
+            query: { redirect: router.currentRoute.value.fullPath || '/app' }
+          })
           return Promise.reject(refreshError)
         } finally {
           isRefreshing = false

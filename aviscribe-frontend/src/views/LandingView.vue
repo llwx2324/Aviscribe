@@ -1,7 +1,70 @@
 <script setup>
-import { useRouter } from 'vue-router';
+import { ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import LoginForm from '@/components/auth/LoginForm.vue'
+import RegisterForm from '@/components/auth/RegisterForm.vue'
 
-const router = useRouter();
+const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
+
+const showLogin = ref(false)
+const showRegister = ref(false)
+const redirectTarget = ref('/app')
+
+const updateAuthStateFromQuery = () => {
+  const authType = route.query.auth
+  showLogin.value = authType === 'login'
+  showRegister.value = authType === 'register'
+  redirectTarget.value = route.query.redirect || '/app'
+}
+
+watch(() => [route.query.auth, route.query.redirect], updateAuthStateFromQuery, { immediate: true })
+
+const openAuth = (type, redirect = '/app') => {
+  const nextQuery = { ...route.query, auth: type, redirect }
+  router.replace({ path: '/', query: nextQuery })
+}
+
+const closeAuth = () => {
+  const nextQuery = { ...route.query }
+  delete nextQuery.auth
+  delete nextQuery.redirect
+  router.replace({ path: '/', query: nextQuery })
+}
+
+const handleAuthSuccess = () => {
+  closeAuth()
+}
+
+const handleLoginClick = (redirect = '/app') => {
+  if (authStore.isAuthenticated()) {
+    router.push(redirect || '/app')
+    return
+  }
+  openAuth('login', redirect)
+}
+
+const handleEnterWorkspace = () => {
+  if (authStore.isAuthenticated()) {
+    router.push('/app')
+    return
+  }
+  handleLoginClick('/app')
+}
+
+const handleRegisterClick = (redirect = '/app') => {
+  openAuth('register', redirect || '/app')
+}
+
+const switchToLogin = () => handleLoginClick(redirectTarget.value || '/app')
+const switchToRegister = () => handleRegisterClick(redirectTarget.value || '/app')
+const handleDialogClosed = (type) => {
+  if (route.query.auth === type) {
+    closeAuth()
+  }
+}
 </script>
 
 <template>
@@ -29,10 +92,32 @@ const router = useRouter();
         上传音视频，马上就能拿到干净的文稿。
       </p>
       <div class="hero-actions single">
-        <el-button type="primary" size="large" class="cta-button" @click="$router.push('/app')">进入工作台</el-button>
+        <el-button type="primary" size="large" class="cta-button" @click="handleEnterWorkspace">进入工作台</el-button>
       </div>
     </div>
   </div>
+
+  <el-dialog
+    v-model="showLogin"
+    title="登录"
+    width="480px"
+    destroy-on-close
+    :close-on-click-modal="false"
+    @closed="handleDialogClosed('login')"
+  >
+    <LoginForm :redirect="redirectTarget" @success="handleAuthSuccess" @switch-register="switchToRegister" />
+  </el-dialog>
+
+  <el-dialog
+    v-model="showRegister"
+    title="注册"
+    width="520px"
+    destroy-on-close
+    :close-on-click-modal="false"
+    @closed="handleDialogClosed('register')"
+  >
+    <RegisterForm :redirect="redirectTarget" @success="handleAuthSuccess" @switch-login="switchToLogin" />
+  </el-dialog>
 </template>
 
 <style scoped>
