@@ -86,6 +86,8 @@ const refreshHistory = () => {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (max-width: 1024px) {

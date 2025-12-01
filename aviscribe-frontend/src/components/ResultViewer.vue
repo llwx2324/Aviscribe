@@ -28,26 +28,9 @@
     />
 
     <el-card class="result-card" :body-style="{ padding: '0' }">
-      <el-tabs type="border-card" class="result-tabs">
-        <el-tab-pane label="排版文档">
-          <div class="markdown-wrapper">
-            <div class="markdown-body" v-html="formattedHtml"></div>
-          </div>
-        </el-tab-pane>
-        <el-tab-pane label="原始转录 (Raw)">
-          <div class="raw-text-wrapper">
-            <el-input 
-              type="textarea" 
-              :rows="20" 
-              :model-value="rawText" 
-              readonly
-              placeholder="暂无原始转录内容"
-              resize="none"
-              class="raw-textarea"
-            />
-          </div>
-        </el-tab-pane>
-      </el-tabs>
+      <div class="markdown-wrapper">
+        <div class="markdown-body" v-html="formattedHtml"></div>
+      </div>
     </el-card>
   </div>
 </template>
@@ -70,7 +53,6 @@ const md = new MarkdownIt({
 const props = defineProps({
   title: { type: String, required: true },
   formattedText: { type: String, default: '' },
-  rawText: { type: String, default: '' },
   error: { type: String, default: null }
 });
 
@@ -97,13 +79,17 @@ const goBack = () => {
 .result-viewer-container {
   max-width: 1000px;
   margin: 0 auto;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .result-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
 }
 
 .header-left {
@@ -119,34 +105,34 @@ const goBack = () => {
   color: var(--text-main);
 }
 
+
 .result-card {
   border: none !important;
   box-shadow: var(--shadow-md) !important;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
 }
 
-.result-tabs :deep(.el-tabs__content) {
-  padding: 0;
+.result-card :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0 !important;
+  min-height: 0;
 }
 
 .markdown-wrapper {
   padding: 40px;
   background-color: #ffffff;
-  min-height: 400px;
-}
-
-.raw-text-wrapper {
-  padding: 20px;
-  background-color: #f8fafc;
-}
-
-.raw-textarea :deep(.el-textarea__inner) {
-  background-color: #ffffff;
-  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #475569;
-  padding: 16px;
-  border-radius: 8px;
+  flex: 1;
+  box-sizing: border-box;
+  width: 100%;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .empty-state {

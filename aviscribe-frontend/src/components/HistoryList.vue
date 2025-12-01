@@ -349,8 +349,8 @@ defineExpose({ fetchTasks });
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  padding: 0 0 96px 0;
-  scroll-padding-bottom: 96px;
+  padding: 0 0 32px 0;
+  scroll-padding-bottom: 32px;
   box-sizing: border-box;
 }
 
@@ -491,10 +491,11 @@ defineExpose({ fetchTasks });
 }
 
 .pagination-mini {
-  padding: 8px;
+  padding: 4px 8px 0;
   display: flex;
   justify-content: center;
   border-top: 1px solid var(--border-color);
+  margin-top: auto;
 }
 
 .refresh-btn {

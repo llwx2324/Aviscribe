@@ -3,11 +3,10 @@
     <div v-if="loading" class="loading-wrapper">
       <LoadingSpinner text="正在获取转录结果..." :size="40" />
     </div>
-    <div v-else-if="task">
+    <div v-else-if="task" class="viewer-wrapper">
       <ResultViewer
         :title="(task.taskName && task.taskName.trim()) || '未命名任务'"
         :formatted-text="task.formattedText"
-        :raw-text="task.rawText"
         :error="task.errorLog"
       />
     </div>
@@ -65,19 +64,34 @@ watch(
 
 <style scoped>
 .result-view {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   padding-bottom: 40px;
+  box-sizing: border-box;
 }
 
-.loading-wrapper {
-  min-height: 60vh;
+.viewer-wrapper,
+.loading-wrapper,
+.error-state {
+  flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.viewer-wrapper {
+  align-items: stretch;
+  justify-content: stretch;
+}
+
 .error-state {
   padding: 60px 0;
-  display: flex;
-  justify-content: center;
+}
+
+.loading-wrapper {
+  min-height: auto;
 }
 </style>

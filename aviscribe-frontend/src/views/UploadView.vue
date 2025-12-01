@@ -13,9 +13,14 @@ defineEmits(['upload-success']);
 <style scoped>
 .upload-simple {
   width: 100%;
-  max-width: 1080px;
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 24px 0 60px;
+  padding: 24px 0 40px;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
 @media (max-width: 1024px) {
