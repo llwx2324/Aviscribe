@@ -31,6 +31,14 @@ const isTimestampValid = (epochSeconds) => {
   return epochSeconds * 1000 > Date.now() + EXP_SKEW_MS
 }
 
+const hasValidAccessToken = () => {
+  return Boolean(state.accessToken) && isTimestampValid(state.accessTokenExpiresAt)
+}
+
+const hasValidRefreshToken = () => {
+  return Boolean(state.refreshToken) && isTimestampValid(state.refreshTokenExpiresAt)
+}
+
 function persistState() {
   if (state.accessToken) {
     localStorage.setItem(ACCESS_TOKEN_KEY, state.accessToken)
@@ -79,20 +87,19 @@ function updateProfile(profile) {
 }
 
 function isAuthenticated() {
-  if (!state.accessToken) return false
-  if (!isTimestampValid(state.accessTokenExpiresAt)) {
-    clearSession()
-    return false
+  if (hasValidAccessToken() || hasValidRefreshToken()) {
+    return true
   }
-  return true
+  clearSession()
+  return false
 }
 
 function getAccessToken() {
-  return isAuthenticated() ? state.accessToken : ''
+  return hasValidAccessToken() ? state.accessToken : ''
 }
 
 function getRefreshToken() {
-  if (state.refreshToken && isTimestampValid(state.refreshTokenExpiresAt)) {
+  if (hasValidRefreshToken()) {
     return state.refreshToken
   }
   clearSession()

@@ -123,19 +123,20 @@ const handleDialogClosed = (type) => {
 <style scoped>
 .landing-centered {
   width: 100%;
-  min-height: calc(100vh - 72px);
+  min-height: calc(100vh - var(--app-header-height, 72px));
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  padding: 0 16px 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
 }
 
 .hero-content {
   text-align: center;
   max-width: 900px;
   padding: 0 24px;
-  margin-top: -40px;
+  margin-top: 0;
   animation: fadeIn 0.8s ease-out;
 }
 

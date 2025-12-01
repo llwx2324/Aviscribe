@@ -109,6 +109,7 @@ gen_frontend.js
 start-all.bat
 stop-all.bat
 structure.txt
+issues.docx
 
 # Backend build
 aviscribe-backend/target/
@@ -123,4 +124,6 @@ aviscribe-frontend/dist/
 
 # Frontend env (如含敏感信息再开启)
 # aviscribe-frontend/.env
+
+.gitattributes
 

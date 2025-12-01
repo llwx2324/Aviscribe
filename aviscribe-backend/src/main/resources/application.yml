@@ -1,5 +1,5 @@
 server:
-  port: 8081
+  port: 8082
   servlet:
     context-path: /api # API 根路径
 
@@ -84,6 +84,11 @@ aviscribe:
     api-key: ${DS_API_KEY:}
     base-url: ${DS_BASE_URL:https://api.deepseek.com}
     model: ${DS_MODEL:deepseek-chat}
+    max-concurrent: 1 # LLM 排版同时并发数，避免触发限流
+    acquire-timeout-ms: 120000 # 获取排版令牌的最长等待时间
+    retry:
+      max-attempts: 3 # 触发限流/网络错误时的重试次数
+      backoff-ms: 2000 # 每次重试之间的基础退避时间
   downloader:
     # yt-dlp 可执行文件路径，确保已安装并在 PATH 中，或写绝对路径，例如 "C:/tools/yt-dlp.exe"
     yt-dlp-path: "yt-dlp"
@@ -91,8 +96,8 @@ aviscribe:
     jwt:
       # !!! 请使用长度>=32的随机字符串
       secret: ${AVISCRIBE_JWT_SECRET:default-jwt-secret-change-me-please-1234567890}
-      access-exp-minutes: 30
-      refresh-exp-days: 7
+      access-exp-minutes: 120 
+      refresh-exp-days: 14 
     rate-limit:
       auth:
         max-requests: 10

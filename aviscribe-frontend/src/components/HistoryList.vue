@@ -219,8 +219,36 @@ const submitTaskName = async () => {
   }
 };
 
+const STATUS_NAME_MAP = {
+  PENDING: 1,
+  DOWNLOADING: 2,
+  EXTRACTING_AUDIO: 3,
+  TRANSCRIBING: 4,
+  FORMATTING: 5,
+  COMPLETED: 6,
+  FAILED: 7
+};
+
+const normalizeStatus = (status) => {
+  if (typeof status === 'number') {
+    return status;
+  }
+  if (typeof status === 'string') {
+    const trimmed = status.trim();
+    const numeric = Number(trimmed);
+    if (!Number.isNaN(numeric)) {
+      return numeric;
+    }
+    const upper = trimmed.toUpperCase();
+    if (STATUS_NAME_MAP[upper]) {
+      return STATUS_NAME_MAP[upper];
+    }
+  }
+  return 0;
+};
+
 const getStatusTagType = (status) => {
-  switch (status) {
+  switch (normalizeStatus(status)) {
     case 6: return 'success';
     case 7: return 'danger';
     case 1: 
@@ -230,7 +258,7 @@ const getStatusTagType = (status) => {
 };
 
 const getStatusClass = (status) => {
-  switch (status) {
+  switch (normalizeStatus(status)) {
     case 6: return 'done';
     case 7: return 'failed';
     case 1:
@@ -380,6 +408,7 @@ defineExpose({ fetchTasks });
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0; /* 允许文本在 Flex 下正确省略而不挤压状态点 */
 }
 
 .item-title {
@@ -412,6 +441,7 @@ defineExpose({ fetchTasks });
   margin-right: 10px;
   background: #cbd5f5;
   box-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
+  flex-shrink: 0; /* 长标题时保持点的宽度 */
 }
 
 .status-chip {

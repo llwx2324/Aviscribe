@@ -251,8 +251,10 @@ const goRegister = () => router.push({ name: 'register' })
 
 .main-container.landing-main {
   padding: 0;
+  min-height: calc(100vh - var(--app-header-height, 72px));
   height: auto;
   overflow: visible;
+  display: flex;
 }
 
 .main-container.landing-main::before {
