@@ -16,6 +16,26 @@
           <el-icon style="margin-right: 6px"><CopyDocument /></el-icon>
           复制内容
         </el-button>
+        <el-dropdown @command="handleDownload" placement="bottom-end">
+          <el-button
+            type="primary"
+            :disabled="!formattedText"
+          >
+            <el-icon style="margin-right: 6px"><Download /></el-icon>
+            下载
+            <el-icon class="dropdown-caret"><ArrowDown /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="markdown">
+                下载为 Markdown (.md)
+              </el-dropdown-item>
+              <el-dropdown-item command="docx">
+                下载为 Word (.docx)
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
 
@@ -38,18 +58,12 @@
 <script setup>
 import { defineProps, computed } from 'vue';
 import { ElMessage } from 'element-plus';
-import { ArrowLeft, CopyDocument } from '@element-plus/icons-vue';
-import MarkdownIt from 'markdown-it';
+import { ArrowDown, ArrowLeft, CopyDocument, Download } from '@element-plus/icons-vue';
+import { renderSafeMarkdown } from '@/utils/markdown';
 import { useRouter, useRoute } from 'vue-router';
 
 const router = useRouter();
 const route = useRoute();
-const md = new MarkdownIt({
-  html: true,
-  linkify: true,
-  typographer: true
-});
-
 const props = defineProps({
   title: { type: String, required: true },
   formattedText: { type: String, default: '' },
@@ -57,7 +71,7 @@ const props = defineProps({
 });
 
 const formattedHtml = computed(() => {
-  return props.formattedText ? md.render(props.formattedText) : '<div class="empty-state">排版文档生成中或失败。</div>';
+  return props.formattedText ? renderSafeMarkdown(props.formattedText) : '<div class="empty-state">排版文档生成中或失败。</div>';
 });
 
 const copyResult = () => {
@@ -66,6 +80,47 @@ const copyResult = () => {
   }).catch(() => {
     ElMessage.error('复制失败，请手动复制');
   });
+};
+
+const buildExportPayload = () => ({
+  title: props.title?.trim() || '导出内容',
+  markdown: props.formattedText,
+  html: formattedHtml.value
+});
+
+const triggerMarkdownDownload = (payload) => {
+  const { markdown, title } = payload;
+  if (!markdown) {
+    ElMessage.warning('当前暂无可导出的内容');
+    return;
+  }
+
+  const safeName = title.replace(/[\\/:*?"<>|]/g, '_') || '导出内容';
+  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${safeName}.md`;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
+const handleDownload = (command) => {
+  const payload = buildExportPayload();
+
+  if (!payload.markdown) {
+    ElMessage.warning('当前暂无可导出的内容');
+    return;
+  }
+
+  if (command === 'markdown') {
+    triggerMarkdownDownload(payload);
+    return;
+  }
+
+  if (command === 'docx') {
+    ElMessage.info('Word 导出功能即将上线');
+  }
 };
 
 const backTarget = computed(() => route.meta.backTo || '/app/tasks');
@@ -90,6 +145,16 @@ const goBack = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dropdown-caret {
+  margin-left: 4px;
 }
 
 .header-left {

@@ -1,35 +1,40 @@
 server:
   port: 8082
+  forward-headers-strategy: framework
+  shutdown: graceful
   servlet:
     context-path: /api # API 根路径
+    encoding:
+      enabled: true
+      charset: UTF-8
+      force: true
 
 spring:
   application:
     name: aviscribe-backend
-  
+  lifecycle:
+    timeout-per-shutdown-phase: 40s
   # 数据库配置
   datasource:
-    url: jdbc:mysql://localhost:3306/aviscribe_db?serverTimezone=UTC&useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: 81287317 # !!! 替换为你的 MySQL 密码
+    url: ${DB_URL:jdbc:mysql://localhost:3306/aviscribe_db?serverTimezone=UTC&useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    # 不提供默认密码，避免开发配置被误用于生产环境。
+    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
-  # MyBatis Plus 配置
-  mybatis-plus:
-    mapper-locations: classpath:/mapper/*.xml
-    global-config:
-      db-config:
-        logic-delete-field: false # 
-        id-type: auto
-    configuration:
-      log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 打印 SQL
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
 
   # 文件上传配置
   servlet:
     multipart:
       enabled: true
-      max-file-size: 1024MB # 1GB
-      max-request-size: 1024MB
+      max-file-size: 500MB
+      max-request-size: 500MB
 
   # 异步线程池配置 (见 ThreadPoolConfig.java)
   task:
@@ -39,11 +44,23 @@ spring:
         max-size: 16  # 最大线程数
         queue-capacity: 100 # 队列容量
 
+# MyBatis Plus 配置
+mybatis-plus:
+  mapper-locations: classpath:/mapper/*.xml
+  global-config:
+    db-config:
+      logic-delete-field: false
+      id-type: auto
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
 # 自定义配置
 aviscribe:
+  jobs:
+    recovery-enabled: ${AVISCRIBE_JOB_RECOVERY_ENABLED:true}
   file:
-    # !!! 替换为你服务器上用于存储的真实路径
-    upload-path: "D:/aviscribe/files/"
+    upload-path: ${AVISCRIBE_UPLOAD_PATH:D:/aviscribe/files/}
+    max-upload-size-bytes: ${AVISCRIBE_MAX_UPLOAD_SIZE_BYTES:524288000}
   ffmpeg:
     # Windows 下直接用 PATH 中的 ffmpeg，可留空或写 "ffmpeg"
     path: "ffmpeg"
@@ -92,10 +109,14 @@ aviscribe:
   downloader:
     # yt-dlp 可执行文件路径，确保已安装并在 PATH 中，或写绝对路径，例如 "C:/tools/yt-dlp.exe"
     yt-dlp-path: "yt-dlp"
+    max-download-size-bytes: ${AVISCRIBE_MAX_DOWNLOAD_SIZE_BYTES:524288000}
+    connect-timeout-ms: ${AVISCRIBE_DOWNLOAD_CONNECT_TIMEOUT_MS:10000}
+    read-timeout-ms: ${AVISCRIBE_DOWNLOAD_READ_TIMEOUT_MS:30000}
+    process-timeout-seconds: ${AVISCRIBE_DOWNLOAD_PROCESS_TIMEOUT_SECONDS:1800}
   security:
     jwt:
-      # !!! 请使用长度>=32的随机字符串
-      secret: ${AVISCRIBE_JWT_SECRET:default-jwt-secret-change-me-please-1234567890}
+      # 必填，长度至少 32 字节；缺失时应用应拒绝启动。
+      secret: ${AVISCRIBE_JWT_SECRET}
       access-exp-minutes: 120 
       refresh-exp-days: 14 
     rate-limit:
@@ -105,4 +126,15 @@ aviscribe:
 
 logging:
   level:
-    com.aviscribe: debug
+    com.aviscribe: ${AVISCRIBE_LOG_LEVEL:info}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never

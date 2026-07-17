@@ -4,8 +4,6 @@ import com.aviscribe.entity.Task;
 import com.aviscribe.service.SpeechToTextService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
 import com.aliyuncs.CommonRequest;
 import com.aliyuncs.CommonResponse;
 import com.aliyuncs.DefaultAcsClient;
@@ -89,11 +87,6 @@ public class SpeechToTextServiceImpl implements SpeechToTextService {
         if (audioPath == null || audioPath.isEmpty()) {
             throw new IllegalArgumentException("audioPath 不能为空");
         }
-        // 调试：打印当前使用的 appKey / accessKeyId 前缀，确认配置是否从环境变量正确注入
-        log.info("[STT] 当前使用的 appKey 前缀: {}..., accessKeyId 前缀: {}...",
-                appKey != null && appKey.length() > 6 ? appKey.substring(0, 6) : appKey,
-                accessKeyId != null && accessKeyId.length() > 6 ? accessKeyId.substring(0, 6) : accessKeyId);
-
         File audioFile = new File(audioPath);
         if (!audioFile.exists() || !audioFile.isFile()) {
             throw new IllegalArgumentException("音频文件不存在: " + audioPath);
@@ -128,7 +121,7 @@ public class SpeechToTextServiceImpl implements SpeechToTextService {
             fileLink += URLEncoder.encode(fileName, StandardCharsets.UTF_8);
         }
 
-        log.info("[STT] 使用 NLS FileTrans, fileLink={}", fileLink);
+        log.info("[STT] 音频已准备，开始提交 NLS FileTrans");
 
         // 2. 创建 NLS FileTrans 客户端
         DefaultProfile.addEndpoint(endpointName, regionId, product, fileTransDomain);
@@ -153,31 +146,29 @@ public class SpeechToTextServiceImpl implements SpeechToTextService {
         postRequest.setAction(submitAction);
         postRequest.setProduct(product);
 
-        JSONObject taskObject = new JSONObject();
-        taskObject.put("appkey", appKey);
-        taskObject.put("file_link", fileLink);
-        taskObject.put("version", "4.0");
-        taskObject.put("enable_words", true);
-        String taskJson = taskObject.toJSONString();
-        log.info("[STT] SubmitTask 请求体: {}", taskJson);
+        JsonNode taskObject = objectMapper.createObjectNode()
+                .put("appkey", appKey)
+                .put("file_link", fileLink)
+                .put("version", "4.0")
+                .put("enable_words", true);
+        String taskJson = taskObject.toString();
+        log.debug("[STT] SubmitTask 请求已构造");
 
         postRequest.putBodyParameter("Task", taskJson);
         postRequest.setMethod(MethodType.POST);
 
         CommonResponse postResponse = client.getCommonResponse(postRequest);
         String data = postResponse.getData();
-        log.info("[STT] SubmitTask 响应: {}", data);
-
         if (postResponse.getHttpStatus() != 200) {
             throw new ClientException("SubmitTask 调用失败, httpStatus=" + postResponse.getHttpStatus());
         }
 
-        JSONObject result = JSONObject.parseObject(data);
-        String statusText = result.getString("StatusText");
+        JsonNode result = parseResponse(data);
+        String statusText = result.path("StatusText").asText();
         if (!"SUCCESS".equalsIgnoreCase(statusText)) {
             throw new ClientException("SubmitTask 返回非 SUCCESS, StatusText=" + statusText);
         }
-        return result.getString("TaskId");
+        return result.path("TaskId").asText();
     }
 
     private String queryFileTransResult(IAcsClient client, String taskId) throws InterruptedException, ClientException {
@@ -193,21 +184,19 @@ public class SpeechToTextServiceImpl implements SpeechToTextService {
         for (int i = 0; i < maxPollTimes; i++) {
             CommonResponse getResponse = client.getCommonResponse(getRequest);
             String data = getResponse.getData();
-            log.info("[STT] GetTaskResult 响应: {}", data);
-
             if (getResponse.getHttpStatus() != 200) {
                 throw new ClientException("GetTaskResult 调用失败, httpStatus=" + getResponse.getHttpStatus());
             }
 
-            JSONObject root = JSONObject.parseObject(data);
-            String statusText = root.getString("StatusText");
+            JsonNode root = parseResponse(data);
+            String statusText = root.path("StatusText").asText();
             if ("RUNNING".equalsIgnoreCase(statusText) || "QUEUEING".equalsIgnoreCase(statusText)) {
                 Thread.sleep(pollIntervalMs);
                 continue;
             }
 
             if ("SUCCESS".equalsIgnoreCase(statusText)) {
-                resultText = root.getString("Result");
+                resultText = root.path("Result").asText(null);
                 if (resultText == null) {
                     resultText = ""; // 可能是静音等情况
                 }
@@ -221,5 +210,13 @@ public class SpeechToTextServiceImpl implements SpeechToTextService {
             throw new ClientException("在最大轮询次数内未获得识别结果, taskId=" + taskId);
         }
         return resultText;
+    }
+
+    private JsonNode parseResponse(String data) throws ClientException {
+        try {
+            return objectMapper.readTree(data);
+        } catch (Exception ex) {
+            throw new ClientException("第三方服务返回了无效 JSON: " + ex.getMessage());
+        }
     }
 }

@@ -8,6 +8,7 @@ import com.aviscribe.service.JobProcessService;
 import com.aviscribe.service.TaskService;
 import com.aviscribe.service.UploadService;
 import com.aviscribe.common.utils.SecurityUtils;
+import com.aviscribe.security.MediaFileValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,19 +29,18 @@ public class UploadServiceImpl implements UploadService {
 
     private final TaskService taskService;
     private final JobProcessService jobProcessService;
+    private final MediaFileValidator mediaFileValidator;
 
-    public UploadServiceImpl(TaskService taskService, JobProcessService jobProcessService) {
+    public UploadServiceImpl(TaskService taskService, JobProcessService jobProcessService,
+                             MediaFileValidator mediaFileValidator) {
         this.taskService = taskService;
         this.jobProcessService = jobProcessService;
+        this.mediaFileValidator = mediaFileValidator;
     }
 
     @Override
     public Task handleLocalUpload(MultipartFile file, String taskName) {
-        if (file.isEmpty()) {
-            throw new RuntimeException("上传文件不能为空");
-        }
-        String originalFilename = file.getOriginalFilename();
-        String fileExtension = getFileExtension(originalFilename);
+        String fileExtension = mediaFileValidator.validate(file);
         String newFilename = UUID.randomUUID().toString() + fileExtension;
         
         Path storageDir = Paths.get(uploadPath);
@@ -90,13 +90,6 @@ public class UploadServiceImpl implements UploadService {
         return task;
     }
     
-    private String getFileExtension(String filename) {
-        if (filename == null || !filename.contains(".")) {
-            return ".tmp";
-        }
-        return filename.substring(filename.lastIndexOf("."));
-    }
-
     private String normalizeTaskName(String taskName) {
         if (taskName == null) {
             return null;

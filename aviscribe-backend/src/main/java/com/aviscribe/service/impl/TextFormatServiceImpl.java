@@ -152,10 +152,7 @@ public class TextFormatServiceImpl implements TextFormatService {
             throw new RuntimeException("调用 LLM 失败, status=" + response.getStatusCode());
         }
 
-        String respBody = response.getBody();
-        log.debug("[LLM] DeepSeek 响应: {}", respBody);
-
-        return extractContentFromOpenAIStyleResponse(respBody);
+        return extractContentFromOpenAIStyleResponse(response.getBody());
     }
 
     private String buildPrompt(Task task, String rawText) {

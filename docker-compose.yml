@@ -1,0 +1,83 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: aviscribe_db
+      MYSQL_USER: ${DB_USERNAME:-aviscribe}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env}
+      TZ: Asia/Shanghai
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysql -h 127.0.0.1 -u\"$$MYSQL_USER\" -p\"$$MYSQL_PASSWORD\" -D \"$$MYSQL_DATABASE\" --silent --execute 'SELECT 1' >/dev/null 2>&1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  backend:
+    build:
+      context: ./aviscribe-backend
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/aviscribe_db?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true
+      DB_USERNAME: ${DB_USERNAME:-aviscribe}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      AVISCRIBE_JWT_SECRET: ${AVISCRIBE_JWT_SECRET:?set AVISCRIBE_JWT_SECRET in .env}
+      ALIYUN_NLS_APP_KEY: ${ALIYUN_NLS_APP_KEY:?set ALIYUN_NLS_APP_KEY in .env}
+      ALIYUN_ACCESS_KEY_ID: ${ALIYUN_ACCESS_KEY_ID:?set ALIYUN_ACCESS_KEY_ID in .env}
+      ALIYUN_ACCESS_KEY_SECRET: ${ALIYUN_ACCESS_KEY_SECRET:?set ALIYUN_ACCESS_KEY_SECRET in .env}
+      DS_API_KEY: ${DS_API_KEY:?set DS_API_KEY in .env}
+      DS_BASE_URL: ${DS_BASE_URL:-https://api.deepseek.com}
+      DS_MODEL: ${DS_MODEL:-deepseek-chat}
+      AVISCRIBE_UPLOAD_PATH: /var/lib/aviscribe/files/
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0 -Duser.timezone=Asia/Shanghai}
+      TZ: Asia/Shanghai
+    volumes:
+      - media-data:/var/lib/aviscribe/files
+    depends_on:
+      mysql:
+        condition: service_healthy
+    stop_grace_period: 45s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  frontend:
+    build:
+      context: ./aviscribe-frontend
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    stop_grace_period: 15s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  mysql-data:
+  media-data:

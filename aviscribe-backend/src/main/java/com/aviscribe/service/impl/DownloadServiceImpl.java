@@ -1,204 +1,282 @@
 package com.aviscribe.service.impl;
 
+import com.aviscribe.security.UrlSafetyValidator;
+import com.aviscribe.security.UrlSafetyValidator.ValidatedUrl;
 import com.aviscribe.service.DownloadService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import org.apache.hc.client5.http.DnsResolver;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.util.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 @Service
 public class DownloadServiceImpl implements DownloadService {
 
     private static final Logger log = LoggerFactory.getLogger(DownloadServiceImpl.class);
+    private static final int MAX_REDIRECTS = 3;
+    private static final Set<String> YT_DLP_DOMAINS = Set.of(
+            "bilibili.com", "youtube.com", "youtu.be", "v.qq.com",
+            "ixigua.com", "douyin.com", "tiktok.com"
+    );
 
-    /**
-     * 视频本地保存根路径，可与上传目录共用或单独配置，如：D:/aviscribe/uploads
-     */
     @Value("${aviscribe.file.upload-path}")
     private String uploadRootPath;
-
-    /**
-     * yt-dlp 可执行路径（命令或绝对路径），用于解析主流视频网站网页链接
-     */
     @Value("${aviscribe.downloader.yt-dlp-path:yt-dlp}")
     private String ytDlpPath;
+    @Value("${aviscribe.downloader.max-download-size-bytes:524288000}")
+    private long maxDownloadSizeBytes;
+    @Value("${aviscribe.downloader.connect-timeout-ms:10000}")
+    private int connectTimeoutMs;
+    @Value("${aviscribe.downloader.read-timeout-ms:30000}")
+    private int readTimeoutMs;
+    @Value("${aviscribe.downloader.process-timeout-seconds:1800}")
+    private long processTimeoutSeconds;
 
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
+    private final UrlSafetyValidator urlSafetyValidator;
+
+    public DownloadServiceImpl(UrlSafetyValidator urlSafetyValidator) {
+        this.urlSafetyValidator = urlSafetyValidator;
+    }
 
     @Override
     public String download(String url) throws Exception {
-        log.info("开始下载远程视频: {}", url);
-
-        if (isTypicalWebPageUrl(url)) {
-            // 对主流视频平台网页链接，使用 yt-dlp 下载真实视频文件
-            return downloadWithYtDlp(url);
+        ValidatedUrl validatedUrl = urlSafetyValidator.validateAndResolve(url);
+        URI validatedUri = validatedUrl.uri();
+        log.info("开始下载远程媒体: scheme={}, host={}", validatedUri.getScheme(), validatedUri.getHost());
+        if (isSupportedPlatform(validatedUri)) {
+            return downloadWithYtDlp(validatedUri);
         }
-
-        return downloadDirect(url);
+        return downloadDirect(validatedUrl);
     }
 
-    /**
-     * 直接通过 HTTP GET 下载视频直链
-     */
-    private String downloadDirect(String url) throws Exception {
-        // 确保根目录存在
-        Path root = Paths.get(uploadRootPath);
-        if (Files.notExists(root)) {
-            Files.createDirectories(root);
+    private String downloadDirect(ValidatedUrl initialUrl) throws Exception {
+        Path root = ensureStorageRoot();
+        Path target = root.resolve("url-media-" + UUID.randomUUID() + ".mp4");
+        ValidatedUrl current = initialUrl;
+
+        try {
+            for (int redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
+                try (CloseableHttpClient client = createPinnedHttpClient(current);
+                     CloseableHttpResponse response = client.execute(new HttpGet(current.uri()))) {
+                    int status = response.getCode();
+                    if (isRedirect(status)) {
+                        String location = response.getFirstHeader("Location") == null
+                                ? null : response.getFirstHeader("Location").getValue();
+                        if (location == null || redirect == MAX_REDIRECTS) {
+                            throw new IllegalStateException("下载重定向次数过多或缺少 Location");
+                        }
+                        URI redirected = current.uri().resolve(location);
+                        current = urlSafetyValidator.validateAndResolve(redirected.toString());
+                        continue;
+                    }
+                    if (status != 200) {
+                        throw new IllegalStateException("下载失败, HTTP 状态码: " + status);
+                    }
+
+                    HttpEntity entity = response.getEntity();
+                    if (entity == null) {
+                        throw new IllegalStateException("下载响应内容为空");
+                    }
+                    validateResponseHeaders(response, entity);
+                    try (InputStream in = entity.getContent();
+                         OutputStream out = Files.newOutputStream(target)) {
+                        copyWithLimit(in, out, maxDownloadSizeBytes);
+                    }
+                    return target.toAbsolutePath().toString();
+                }
+            }
+            throw new IllegalStateException("下载重定向次数过多");
+        } catch (Exception ex) {
+            Files.deleteIfExists(target);
+            throw ex;
         }
+    }
 
-        // 简单根据 URL 生成文件名，默认 mp4 后缀
-        String fileName = "url-video-" + System.currentTimeMillis() + ".mp4";
-        Path target = root.resolve(fileName);
+    private CloseableHttpClient createPinnedHttpClient(ValidatedUrl validatedUrl) {
+        String expectedHost = validatedUrl.uri().getHost();
+        InetAddress[] pinnedAddresses = validatedUrl.addresses().toArray(InetAddress[]::new);
+        DnsResolver pinnedResolver = new DnsResolver() {
+            @Override
+            public InetAddress[] resolve(String host) throws UnknownHostException {
+                ensureExpectedHost(host);
+                return pinnedAddresses.clone();
+            }
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .GET()
+            @Override
+            public String resolveCanonicalHostname(String host) throws UnknownHostException {
+                ensureExpectedHost(host);
+                return expectedHost;
+            }
+
+            private void ensureExpectedHost(String host) throws UnknownHostException {
+                if (!expectedHost.equalsIgnoreCase(host)) {
+                    throw new UnknownHostException("未校验的下载主机: " + host);
+                }
+            }
+        };
+        var connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
+                .setDnsResolver(pinnedResolver)
                 .build();
-
-        HttpResponse<InputStream> response =
-                httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
-
-        int status = response.statusCode();
-        if (status != 200) {
-            throw new IllegalStateException("下载失败, HTTP 状态码: " + status);
-        }
-
-        // 基础校验：Content-Type 必须是视频类型，避免把 HTML 网页当成视频保存
-        String contentType = response.headers()
-                .firstValue("Content-Type")
-                .orElse("")
-                .toLowerCase();
-        if (!contentType.isEmpty() && !contentType.startsWith("video/")) {
-            // 常见情况: text/html; charset=utf-8 等，表示其实是网页/错误页
-            throw new IllegalStateException("URL 响应的 Content-Type 非视频类型: " + contentType);
-        }
-
-        // 可选: 粗略检查体积，过小的响应大概率不是正常视频文件
-        long contentLength = response.headers()
-                .firstValueAsLong("Content-Length")
-                .orElse(-1L);
-        if (contentLength > 0 && contentLength < 1024) { // <1KB
-            throw new IllegalStateException("URL 响应体过小，疑似不是有效视频，Content-Length=" + contentLength);
-        }
-
-        try (InputStream in = response.body();
-             OutputStream out = Files.newOutputStream(target)) {
-            in.transferTo(out);
-        } catch (IOException e) {
-            // 失败时清理半成品文件
-            try {
-                Files.deleteIfExists(target);
-            } catch (IOException ignore) { }
-            throw e;
-        }
-
-        String localPath = target.toAbsolutePath().toString();
-        log.info("远程视频下载完成(直链), 本地路径: {}", localPath);
-        return localPath;
+        RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectTimeout(Timeout.ofMilliseconds(connectTimeoutMs))
+                .setResponseTimeout(Timeout.ofMilliseconds(readTimeoutMs))
+                .build();
+        return HttpClients.custom()
+                .setConnectionManager(connectionManager)
+                .setDefaultRequestConfig(requestConfig)
+                .disableRedirectHandling()
+                .build();
     }
 
-    /**
-     * 使用本机 yt-dlp 程序解析并下载主流视频网站网页链接
-     */
-    private String downloadWithYtDlp(String url) throws Exception {
-        // 确保根目录存在
-        Path root = Paths.get(uploadRootPath);
-        if (Files.notExists(root)) {
-            Files.createDirectories(root);
+    private void validateResponseHeaders(CloseableHttpResponse response, HttpEntity entity) {
+        String contentType = response.getFirstHeader("Content-Type") == null
+                ? null : response.getFirstHeader("Content-Type").getValue();
+        if (contentType != null) {
+            String normalized = contentType.toLowerCase(Locale.ROOT);
+            if (!normalized.startsWith("video/") && !normalized.startsWith("audio/")
+                    && !normalized.startsWith("application/octet-stream")) {
+                throw new IllegalStateException("URL 响应不是受支持的音视频类型");
+            }
         }
+        long contentLength = entity.getContentLength();
+        if (contentLength > maxDownloadSizeBytes) {
+            throw new IllegalStateException("远程文件超过下载大小限制");
+        }
+    }
 
-        // 生成随机文件名前缀，避免并发冲突
+    private void copyWithLimit(InputStream in, OutputStream out, long limit) throws IOException {
+        byte[] buffer = new byte[8192];
+        long total = 0;
+        int read;
+        while ((read = in.read(buffer)) != -1) {
+            total += read;
+            if (total > limit) {
+                throw new IOException("远程文件超过下载大小限制");
+            }
+            out.write(buffer, 0, read);
+        }
+    }
+
+    private String downloadWithYtDlp(URI uri) throws Exception {
+        Path root = ensureStorageRoot();
         String baseName = "yt-" + UUID.randomUUID();
-        // yt-dlp 的 -o 模板支持 %(ext)s 作为后缀
         Path outTemplate = root.resolve(baseName + ".%(ext)s");
+        long maxMegabytes = Math.max(1, maxDownloadSizeBytes / 1024 / 1024);
+        int socketTimeoutSeconds = Math.max(1, readTimeoutMs / 1000);
 
-        // 加上 --proxy ""，与用户在命令行中的测试行为保持一致
         ProcessBuilder pb = new ProcessBuilder(
                 ytDlpPath,
-                "--proxy", "",
+                "--no-playlist",
+                "--playlist-items", "1",
+                "--socket-timeout", String.valueOf(socketTimeoutSeconds),
+                "--max-filesize", maxMegabytes + "M",
                 "-o", outTemplate.toString(),
-                url
+                uri.toString()
         );
         pb.redirectErrorStream(true);
-
-        log.info("使用 yt-dlp 下载视频, 命令: {} --proxy {} -o {} {}", ytDlpPath, "", outTemplate, url);
-
         Process process;
         try {
             process = pb.start();
-        } catch (IOException e) {
-            throw new IllegalStateException("启动 yt-dlp 失败，请确认已安装并在 PATH 中，或在配置中正确设置 aviscribe.downloader.yt-dlp-path", e);
+        } catch (IOException ex) {
+            throw new IllegalStateException("启动 yt-dlp 失败，请确认程序已安装并正确配置", ex);
         }
 
-        // 读取输出日志，便于调试
         StringBuilder output = new StringBuilder();
+        Thread outputReader = new Thread(() -> readProcessOutput(process, output), "yt-dlp-output");
+        outputReader.setDaemon(true);
+        outputReader.start();
+        boolean completed = process.waitFor(processTimeoutSeconds, TimeUnit.SECONDS);
+        if (!completed) {
+            process.destroyForcibly();
+            outputReader.join(1000);
+            deleteMatchingFiles(root, baseName);
+            throw new IllegalStateException("yt-dlp 下载超时");
+        }
+        outputReader.join(1000);
+        if (process.exitValue() != 0) {
+            deleteMatchingFiles(root, baseName);
+            throw new IllegalStateException("yt-dlp 下载失败, exitCode=" + process.exitValue());
+        }
+
+        try (var stream = Files.list(root)) {
+            Path downloaded = stream
+                    .filter(path -> path.getFileName().toString().startsWith(baseName + "."))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("yt-dlp 执行成功但未找到输出文件"));
+            if (Files.size(downloaded) > maxDownloadSizeBytes) {
+                Files.deleteIfExists(downloaded);
+                throw new IllegalStateException("远程文件超过下载大小限制");
+            }
+            return downloaded.toAbsolutePath().toString();
+        }
+    }
+
+    private void readProcessOutput(Process process, StringBuilder output) {
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                output.append(line).append(System.lineSeparator());
-                log.info("yt-dlp> {}", line);
+                if (output.length() < 16_384) {
+                    output.append(line).append(System.lineSeparator());
+                }
+                log.debug("yt-dlp> {}", line);
             }
-        }
-
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            log.error("yt-dlp 退出码: {}, 输出:\n{}", exitCode, output);
-            throw new IllegalStateException("yt-dlp 下载失败, exitCode=" + exitCode + ", output=" + output);
-        }
-
-        // yt-dlp 完成后，需要找到实际生成的文件
-        try {
-            // 由于我们使用了固定前缀 baseName，可以在目录下按此前缀查找
-            try (var stream = Files.list(root)) {
-                return stream
-                        .filter(p -> p.getFileName().toString().startsWith(baseName + "."))
-                        .findFirst()
-                        .map(p -> {
-                            String lp = p.toAbsolutePath().toString();
-                            log.info("yt-dlp 下载完成, 本地路径: {}", lp);
-                            return lp;
-                        })
-                        .orElseThrow(() -> new IllegalStateException("yt-dlp 执行成功但未找到输出文件"));
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException("扫描 yt-dlp 输出文件失败", e);
+        } catch (IOException ex) {
+            log.debug("读取 yt-dlp 输出失败", ex);
         }
     }
 
-    /**
-     * 粗略判断是否为常见“网页播放链接”，而不是直接可下载的视频文件 URL。
-     * 这些站点的视频实际地址通常需要专门解析库（例如 yt-dlp）才能拿到。
-     */
-    private boolean isTypicalWebPageUrl(String url) {
-        if (url == null) {
-            return false;
+    private Path ensureStorageRoot() throws IOException {
+        Path root = Paths.get(uploadRootPath).toAbsolutePath().normalize();
+        Files.createDirectories(root);
+        return root;
+    }
+
+    private void deleteMatchingFiles(Path root, String prefix) {
+        try (var stream = Files.list(root)) {
+            stream.filter(path -> path.getFileName().toString().startsWith(prefix + "."))
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException ignored) {
+                            log.warn("清理下载临时文件失败: {}", path);
+                        }
+                    });
+        } catch (IOException ignored) {
+            log.warn("扫描下载临时文件失败: {}", root);
         }
-        String lower = url.toLowerCase();
-        return lower.contains("bilibili.com/video/")
-                || lower.contains("youtube.com/watch")
-                || lower.contains("youtu.be/")
-                || lower.contains("v.qq.com/")
-                || lower.contains("ixigua.com/")
-                || lower.contains("douyin.com/")
-                || lower.contains("tiktok.com/");
+    }
+
+    private boolean isSupportedPlatform(URI uri) {
+        String host = uri.getHost().toLowerCase(Locale.ROOT);
+        return YT_DLP_DOMAINS.stream().anyMatch(domain -> host.equals(domain) || host.endsWith("." + domain));
+    }
+
+    private boolean isRedirect(int status) {
+        return status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
     }
 }

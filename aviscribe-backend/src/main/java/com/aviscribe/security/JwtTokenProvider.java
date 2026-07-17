@@ -29,7 +29,8 @@ public class JwtTokenProvider {
 
     public JwtTokenProvider(JwtProperties properties) {
         this.properties = properties;
-        if (!StringUtils.hasText(properties.getSecret()) || properties.getSecret().length() < 32) {
+        if (!StringUtils.hasText(properties.getSecret()) || properties.getSecret().length() < 32
+                || properties.getSecret().startsWith("replace-with")) {
             throw new IllegalArgumentException("JWT secret 长度必须>=32");
         }
         this.signingKey = Keys.hmacShaKeyFor(properties.getSecret().getBytes(StandardCharsets.UTF_8));

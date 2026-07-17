@@ -1,11 +1,11 @@
 import request from './request'
 
 // 上传本地文件
-export function uploadLocalFile(file, title) {
+export function uploadLocalFile(file, taskName) {
   const formData = new FormData()
   formData.append('file', file)
-  if (title) {
-    formData.append('title', title) // 可选
+  if (taskName) {
+    formData.append('taskName', taskName)
   }
   
   return request({
@@ -19,10 +19,10 @@ export function uploadLocalFile(file, title) {
 }
 
 // 提交视频 URL
-export function submitVideoUrl(url, title) {
+export function submitVideoUrl(url, taskName) {
   return request({
     url: '/upload/url',
     method: 'post',
-    data: { url, title }
+    data: { url, taskName }
   })
 }

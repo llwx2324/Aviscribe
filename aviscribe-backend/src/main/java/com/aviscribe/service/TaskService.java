@@ -2,7 +2,7 @@ package com.aviscribe.service;
 
 import com.aviscribe.dto.TaskInfoDTO;
 import com.aviscribe.entity.Task;
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.spring.service.IService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.data.domain.Pageable; // Spring Data Pageable
 

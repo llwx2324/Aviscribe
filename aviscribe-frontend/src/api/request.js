@@ -11,6 +11,7 @@ const refreshClient = axios.create({
 
 let isRefreshing = false
 const pendingQueue = []
+let isRedirectingToLogin = false
 
 const processQueue = (error, token = null) => {
   pendingQueue.forEach(({ resolve, reject, config }) => {
@@ -23,6 +24,22 @@ const processQueue = (error, token = null) => {
     }
   })
   pendingQueue.length = 0
+}
+
+const redirectToLogin = (customMessage) => {
+  if (isRedirectingToLogin) return
+  isRedirectingToLogin = true
+  authStore.clearSession()
+  ElMessage.warning(customMessage || '登录失效，请重新登录')
+  const redirect = router.currentRoute.value?.fullPath || '/app'
+  router.replace({ name: 'login', query: { redirect } })
+    .catch(() => {
+      const redirectParam = encodeURIComponent(redirect)
+      window.location.href = `/login?redirect=${redirectParam}`
+    })
+    .finally(() => {
+      isRedirectingToLogin = false
+    })
 }
 
 // 创建一个 Axios 实例，所有请求将自动带上 /api 前缀
@@ -45,8 +62,12 @@ service.interceptors.request.use(
 // 响应拦截器
 service.interceptors.response.use(
   response => {
-    // 假设后端成功状态码为 200 或 202
-    return response.data
+    const payload = response?.data
+    if (payload && typeof payload === 'object' && payload.code === 401) {
+      redirectToLogin(payload.message)
+      return Promise.reject(payload)
+    }
+    return payload
   },
   async error => {
     let message = '请求失败，请稍后重试'
@@ -57,25 +78,16 @@ service.interceptors.response.use(
       } else if (error.response.status === 404) {
         message = 'API 接口不存在'
       } else if (error.response.status === 401) {
+        message = '登录失效，请重新登录'
         const originalRequest = error.config || {}
         if (originalRequest._retry) {
-          authStore.clearSession()
-          ElMessage.warning('请先登录')
-          router.push({
-            name: 'login',
-            query: { redirect: router.currentRoute.value.fullPath || '/app' }
-          })
+          redirectToLogin()
           return Promise.reject(error)
         }
 
         const refreshToken = authStore.getRefreshToken()
         if (!refreshToken) {
-          authStore.clearSession()
-          ElMessage.warning('请先登录')
-          router.push({
-            name: 'login',
-            query: { redirect: router.currentRoute.value.fullPath || '/app' }
-          })
+          redirectToLogin()
           return Promise.reject(error)
         }
 
@@ -101,12 +113,7 @@ service.interceptors.response.use(
           return service(originalRequest)
         } catch (refreshError) {
           processQueue(refreshError, null)
-          authStore.clearSession()
-          ElMessage.warning('请先登录')
-          router.push({
-            name: 'login',
-            query: { redirect: router.currentRoute.value.fullPath || '/app' }
-          })
+          redirectToLogin()
           return Promise.reject(refreshError)
         } finally {
           isRefreshing = false
@@ -114,6 +121,9 @@ service.interceptors.response.use(
       } else if (error.response.status >= 500) {
         message = '服务器内部错误'
       }
+    }
+    if (error.response && error.response.status === 401) {
+      redirectToLogin(message)
     }
     ElMessage.error(message)
     return Promise.reject(error)

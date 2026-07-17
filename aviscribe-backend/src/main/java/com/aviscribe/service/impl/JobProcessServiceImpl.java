@@ -9,6 +9,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 @Service
 public class JobProcessServiceImpl implements JobProcessService {
 
@@ -20,6 +26,7 @@ public class JobProcessServiceImpl implements JobProcessService {
     private final TextFormatService textFormatService;
     private final DownloadService downloadService;
     private final FfmpegUtils ffmpegUtils;
+    private final Set<Long> activeTaskIds = ConcurrentHashMap.newKeySet();
 
     public JobProcessServiceImpl(TaskService taskService,
                                  AudioExtractService audioExtractService,
@@ -38,12 +45,26 @@ public class JobProcessServiceImpl implements JobProcessService {
     @Override
     @org.springframework.scheduling.annotation.Async("taskExecutor")
     public void processTask(Long taskId) {
+        if (taskId == null || !activeTaskIds.add(taskId)) {
+            log.info("[Task {}] 已在当前实例处理中，跳过重复调度", taskId);
+            return;
+        }
         log.info("[Task {}] 开始处理...", taskId);
-        Task task = taskService.getById(taskId);
 
         try {
+            Task task = taskService.getById(taskId);
+            if (task == null) {
+                log.warn("[Task {}] 任务不存在，停止处理", taskId);
+                return;
+            }
+            if (task.getTaskStatus() != null
+                    && (task.getTaskStatus() == TaskStatus.COMPLETED.getCode()
+                    || task.getTaskStatus() == TaskStatus.FAILED.getCode())) {
+                log.info("[Task {}] 已处于终态，跳过处理", taskId);
+                return;
+            }
             // 1. 如果是 URL 源，先从网络下载到本地，填充 videoLocalPath
-            if (task.getSourceType() == SourceType.URL.getValue()) {
+            if (task.getSourceType() == SourceType.URL.getValue() && !isUsableFile(task.getVideoLocalPath())) {
                 taskService.updateTaskStatus(taskId, TaskStatus.DOWNLOADING);
                 log.info("[Task {}] URL 下载阶段，开始下载远程视频...", taskId);
 
@@ -58,25 +79,34 @@ public class JobProcessServiceImpl implements JobProcessService {
             }
 
             // 2. 音频提取
-            taskService.updateTaskStatus(taskId, TaskStatus.EXTRACTING_AUDIO);
-            log.info("[Task {}] 正在提取音频...", taskId);
-            String audioPath = audioExtractService.extractAudio(task);
-            task.setAudioLocalPath(audioPath);
-            taskService.updateById(task);
+            String audioPath = task.getAudioLocalPath();
+            if (!isUsableFile(audioPath)) {
+                taskService.updateTaskStatus(taskId, TaskStatus.EXTRACTING_AUDIO);
+                log.info("[Task {}] 正在提取音频...", taskId);
+                audioPath = audioExtractService.extractAudio(task);
+                task.setAudioLocalPath(audioPath);
+                taskService.updateById(task);
+            }
             updateDurationIfNeeded(task);
 
             // 3. 语音转文本
-            taskService.updateTaskStatus(taskId, TaskStatus.TRANSCRIBING);
-            log.info("[Task {}] 正在语音识别...", taskId);
-            String rawText = speechToTextService.transcribe(task, audioPath);
-            task.setRawText(rawText);
-            taskService.updateById(task);
+            String rawText = task.getRawText();
+            if (!hasText(rawText)) {
+                taskService.updateTaskStatus(taskId, TaskStatus.TRANSCRIBING);
+                log.info("[Task {}] 正在语音识别...", taskId);
+                rawText = speechToTextService.transcribe(task, audioPath);
+                task.setRawText(rawText);
+                taskService.updateById(task);
+            }
 
             // 4. 文本排版
-            taskService.updateTaskStatus(taskId, TaskStatus.FORMATTING);
-            log.info("[Task {}] 正在文本排版...", taskId);
-            String formattedText = textFormatService.format(task, rawText);
-            task.setFormattedText(formattedText);
+            String formattedText = task.getFormattedText();
+            if (!hasText(formattedText)) {
+                taskService.updateTaskStatus(taskId, TaskStatus.FORMATTING);
+                log.info("[Task {}] 正在文本排版...", taskId);
+                formattedText = textFormatService.format(task, rawText);
+                task.setFormattedText(formattedText);
+            }
             if (!hasText(task.getTaskName())) {
                 String derivedTitle = extractTitleFromFormattedText(formattedText);
                 if (hasText(derivedTitle)) {
@@ -92,11 +122,24 @@ public class JobProcessServiceImpl implements JobProcessService {
         } catch (Exception e) {
             log.error("[Task {}] 处理失败: {}", taskId, e.getMessage(), e);
             taskService.updateTaskError(taskId, e.getMessage());
+        } finally {
+            activeTaskIds.remove(taskId);
         }
     }
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private boolean isUsableFile(String value) {
+        if (!hasText(value)) {
+            return false;
+        }
+        try {
+            return Files.isRegularFile(Path.of(value));
+        } catch (InvalidPathException ex) {
+            return false;
+        }
     }
 
     private String extractTitleFromFormattedText(String formattedText) {

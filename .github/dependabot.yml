@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /aviscribe-backend
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /aviscribe-frontend
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /aviscribe-backend
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /aviscribe-frontend
+    schedule:
+      interval: weekly

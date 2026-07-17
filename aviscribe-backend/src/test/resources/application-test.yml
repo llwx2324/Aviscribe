@@ -8,6 +8,8 @@ spring:
     init:
       mode: always
       schema-locations: classpath:schema.sql
+  flyway:
+    enabled: false
   jpa:
     hibernate:
       ddl-auto: none
@@ -24,6 +26,8 @@ logging:
     com.aviscribe: info
 
 aviscribe:
+  jobs:
+    recovery-enabled: false
   file:
     upload-path: "./test-uploads/"
   ffmpeg:

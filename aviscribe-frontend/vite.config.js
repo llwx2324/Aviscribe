@@ -15,6 +15,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // allowedHosts: true, // 允许所有主机访问
     // 配置代理，将所有 /api/* 请求转发到后端
     proxy: {
       '/api': {

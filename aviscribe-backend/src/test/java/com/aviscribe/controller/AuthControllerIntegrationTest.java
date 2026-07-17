@@ -78,6 +78,15 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    void malformedJsonReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/v1/auth/register")
+                        .with(sameClient())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{username:broken}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void userCannotAccessOthersTask() throws Exception {
         String usernameA = randomUsername();
         String usernameB = randomUsername();

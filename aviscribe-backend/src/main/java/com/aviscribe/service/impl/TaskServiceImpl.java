@@ -11,7 +11,7 @@ import com.aviscribe.mapper.TaskMapper;
 import com.aviscribe.service.TaskService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.data.domain.Pageable; // Spring Data
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -61,6 +61,11 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         Task task = this.getById(id);
         if (task != null) {
             ensureTaskAccessible(task);
+            if (task.getTaskStatus() != null
+                    && task.getTaskStatus() != TaskStatus.COMPLETED.getCode()
+                    && task.getTaskStatus() != TaskStatus.FAILED.getCode()) {
+                throw new IllegalStateException("任务处理中，暂不可删除");
+            }
             // 删除关联的本地视频、音频文件
             fileUtils.deleteFileQuietly(task.getVideoLocalPath());
             fileUtils.deleteFileQuietly(task.getAudioLocalPath());

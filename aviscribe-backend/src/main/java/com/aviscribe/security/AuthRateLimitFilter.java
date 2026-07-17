@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.http.MediaType;
@@ -46,6 +47,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         if (!allowed) {
             response.setStatus(429);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
             Map<String, Object> body = new HashMap<>();
             body.put("code", 429);
             body.put("message", "请求过于频繁，请稍后再试");
